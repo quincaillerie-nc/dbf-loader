@@ -1,14 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-================================================================================
-MODULE : dbf-loader / dbf_loader.py
-================================================================================
-Charge un fichier .DBF depuis un partage réseau SMB.
-- Windows : lecture directe via chemin UNC
-- Linux   : copie temporaire via smbclient puis lecture locale
-================================================================================
-"""
-
 import platform
 import subprocess
 import os
@@ -17,21 +7,17 @@ from dbfread import DBF
 import pandas as pd
 from dotenv import load_dotenv
 
-# Charge le .env depuis la racine dev/
-load_dotenv(Path(__file__).parent.parent.parent / ".env")
+# Charge le .env depuis le dossier du module
+load_dotenv(Path(__file__).parent / ".env")
 
 # =====================================================
 # CONFIG SMB  (lues depuis .env)
 # =====================================================
-SMB_HOST     = os.getenv("SMB_HOST",     "//192.168.0.250/bases")
-SMB_USER     = os.getenv("SMB_USER",     "supportserv")
-SMB_PASSWORD = os.getenv("SMB_PASSWORD", "")
-
-# Chemin réseau Windows (UNC)
+SMB_HOST     = os.getenv("SMB_HOST",         "//192.168.0.250/bases")
+SMB_USER     = os.getenv("SMB_USER",         "supportserv")
+SMB_PASSWORD = os.getenv("SMB_PASSWORD",     "")
 WINDOWS_BASE = os.getenv("SMB_WINDOWS_BASE", r"\\192.168.0.250\Bases")
-
-# Dossier temporaire Linux
-LINUX_TMP = "/tmp"
+LINUX_TMP    = "/tmp"
 
 
 # =====================================================
@@ -45,19 +31,6 @@ def is_windows() -> bool:
 # POINT D'ENTRÉE PUBLIC
 # =====================================================
 def get_dbf(chemin_relatif: str) -> pd.DataFrame:
-    """
-    Charge un fichier .DBF depuis le réseau et retourne un DataFrame pandas.
-
-    Paramètres
-    ----------
-    chemin_relatif : str
-        Chemin depuis la racine du partage SMB.
-        Exemple : "qc/article.dbf"
-
-    Retourne
-    --------
-    pandas.DataFrame
-    """
     if is_windows():
         return _load_windows(chemin_relatif)
     else:
@@ -88,14 +61,12 @@ def _load_linux(chemin_relatif: str) -> pd.DataFrame:
     cmd = [
         "smbclient", SMB_HOST,
         "-U", f"{SMB_USER}%{SMB_PASSWORD}",
-        "-c", f'get "{chemin_relatif}" "{tmp_path}"'
+        "-c", f"get {chemin_relatif} {tmp_path}"
     ]
 
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
-        raise RuntimeError(
-            f"[DBF_LOADER] Échec smbclient :\n{result.stderr}"
-        )
+        raise RuntimeError(f"[DBF_LOADER] Échec smbclient :\n{result.stderr}")
 
     print(f"[DBF_LOADER] Fichier copié : {tmp_path}")
     return _read_dbf(tmp_path)
